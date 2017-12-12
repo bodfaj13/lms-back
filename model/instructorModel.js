@@ -1,8 +1,10 @@
 var mongoose = require('../config/mongoose');
 var bcrypt = require('bcrypt');
 
-var adminSchema = mongoose.Schema({
-  
+var InstructorSchema = mongoose.Schema({
+    name:{
+        type: String,
+    },
     username: {
         type: String,
         unique: true,
@@ -10,12 +12,12 @@ var adminSchema = mongoose.Schema({
     },
     password: {
         type: String,
-        required: true,
         bcrypt: true
     },
     emailAddress: {
         unique: true,
-        type: String
+        type: String,
+        unique: true
     },
     priviledge: {
         type: String,
@@ -23,9 +25,13 @@ var adminSchema = mongoose.Schema({
     },
     profilePicture : {
         type: String
-    }
+    },
+    createdAt: {
+        type: Date,
+        // required: true
+    },
 });
 
-var Admin = mongoose.model('admin', adminSchema);
- module.exports = Admin
+var Instructor = mongoose.model('teachers', InstructorSchema);
+ module.exports = Instructor
 

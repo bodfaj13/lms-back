@@ -12,6 +12,7 @@ var qs = require('querystring')
 var moment = require('moment');
 var Publication = require('../model/publicationModel');
 var Admin = require('../model/adminModel');
+var Instructor = require('../model/instructorModel');
 var multer = require('multer'); 
 var Storage = multer.diskStorage({
   destination: function(req, file, callback) {
@@ -37,23 +38,49 @@ var upload = multer({
 
 /* GET home page. */
 router.get('/api', function(req, res, next) {
-  var newAdmin = new Admin({ username: "admin", password: "admin" })
-  newAdmin.save().then((data)=>console.log(data),(err)=>console.log(err))
+  var newAdmin = new Admin({ username: "admin2", priviledge: "admin", emailAddress: "admin@admin.com", password: "admin" })
+  var newInstructor = new Instructor({ username: "test", priviledge: "instructor", emailAddress: "admin@text.com", password: "test" })
+  // newAdmin.save().then((data) => console.log(data), (err) => console.log(err))
+  // newInstructor.save().then((data) => console.log(data), (err) => console.log(err))
+  Instructor.find().then((user)=>console.log(user))
   res.render('index', {title:" Express"});
 });
 
 router.post('/api/adminlogin', function (req, res, next) {
   var username = req.body.username;
   var password = req.body.password;
-  Admin.findOne({"username":username,"password":password}).then((data)=>{
-    if(data){
-      console.log(data)
-      var obj = {username : data.username}
-      var token = jwt.sign(obj, appdetails.jwtSecret).toString();
+  Admin.findOne({"username":username,"password":password}).then((user)=>{
+    if(user){
+      console.log(user)
+      var info = {
+        id: user._id,
+        email: user.emailAddress,
+        username: user.username,
+        priviledge: user.priviledge
+      }
+      var token = jwt.sign(info, appdetails.jwtSecret).toString();
       res.json({ "token": token });
-    } else res.send({})
+    } else res.send({});
   });
 
+})
+router.post('/api/instructorlogin', function (req, res, next) {
+  var username = req.body.username;
+  var password = req.body.password;
+  Instructor.findOne({ username: username, password: password }).then((user) => {
+  // Instructor.find().then((user)=>console.log(user))
+    if (user) {
+      console.log(user)
+      var data = {
+        id: user._id,
+        email: user.emailAddress,
+        username: user.username,
+        priviledge: user.priviledge
+      }
+      var token = jwt.sign(data, appdetails.jwtSecret).toString();
+      res.json({ "token": token });
+    } else res.send({user: "username/password incorrect"});
+  });
 })
 //user login route
 router.post('/api/userlogin', function(req, res, next){
