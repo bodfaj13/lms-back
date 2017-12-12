@@ -16,6 +16,8 @@ var config = require('./config/config');
 var crypto = require('crypto');
 var async = require('async');
 var nodemailer = require('nodemailer');
+var moment = require('moment');
+var multer = require('multer');
 
 var index = require('./routes/index');
 var users = require('./routes/users');

@@ -7,5 +7,10 @@
   <body>
     <h1><%= title %></h1>
     <p>Welcome to <%= title %></p>
+
+    <form action="/api/addpublicationimg" method="POST"  enctype="multipart/form-data">
+		 <input type="file" name="avatar" />
+		 <button type="submit">Send</button>
+	</form>
   </body>
 </html>

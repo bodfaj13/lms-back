@@ -152,3 +152,4 @@ module.exports.updatePassword =  function(getUser, callback){
 
     User.update(cond, update, options, callback);
 }
+

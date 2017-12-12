@@ -1,37 +1,60 @@
 var express = require('express');
 var router = express.Router();
-// var passport = require('passport');
 var bcrypt = require('bcrypt');
 var User = require('../model/userModel');
 var appdetails = require('../config/appdetails.json');
 var crypto = require('crypto');
 var async = require('async');
-var qs = require("querystring")
 var nodemailer = require('nodemailer');
 var jwt = require('jsonwebtoken');
+var Course = require('../model/coursesModel');
+var qs = require('querystring')
+var moment = require('moment');
+var Publication = require('../model/publicationModel');
+var Admin = require('../model/adminModel');
+var multer = require('multer'); 
+var Storage = multer.diskStorage({
+  destination: function(req, file, callback) {
+      callback(null, "./public/images/publications");
+  },
+  filename: function(req, file, callback) {
+      callback(null, file.fieldname + "_" + Date.now() + "_" + file.originalname);
+  }
+});
+var upload = multer({
+  storage: Storage,
+  limits: {fileSize: 5*1024*1024}, //5mb limit
+  fileFilter: function(req, file, cb){
+    var mimeType = file.mimetype;
+    if(mimeType == 'image/gif' || mimeType == 'image/jpeg' || mimeType == 'image/png' || mimeType == 'image/jpg'){
+      cb(null, true);
+    }else{
+      cb(null, false);
+    }
+  }
+}).single("avatar");
+
 
 /* GET home page. */
-router.get('/', function(req, res, next) {
-  res.json(true);
+router.get('/api', function(req, res, next) {
+  var newAdmin = new Admin({ username: "admin", password: "admin" })
+  newAdmin.save().then((data)=>console.log(data),(err)=>console.log(err))
+  res.render('index', {title:" Express"});
 });
 
-router.get('/api/userprofile', function (req, res, next) {
-  User.find({ emailAddress : req.query.email}).then((user)=>{
-    console.log(user)
-    if (user) res.json(user); else res.json({})
-  },(err)=>res.sendStatus(404));
-});
-// passport serialize and deserialize
-// passport.serializeUser(function(user, done) {
-//   done(null, user._id);
-// });
+router.post('/api/adminlogin', function (req, res, next) {
+  var username = req.body.username;
+  var password = req.body.password;
+  Admin.findOne({"username":username,"password":password}).then((data)=>{
+    if(data){
+      console.log(data)
+      var obj = {username : data.username}
+      var token = jwt.sign(obj, appdetails.jwtSecret).toString();
+      res.json({ "token": token });
+    } else res.send({})
+  });
 
-// passport.deserializeUser(function(id, done) {
-//   User.getUserById(id, function (err, user) {
-//     done(err, user);
-//   });
-// });
-
+})
 //user login route
 router.post('/api/userlogin', function(req, res, next){
   var email = req.body.email;
@@ -62,9 +85,9 @@ router.post('/api/userlogin', function(req, res, next){
                clearanceLevel: user.clearanceLevel
              }
              var token = jwt.sign(data, appdetails.jwtSecret).toString();
-             res.header('x-auth', token).json({"token":token});
+             res.header('x-auth', token).json({"token": token});
             }else{
-              res.json({'password':'password is incorrect'});
+              res.json({"password" : "password is incorrect"});
             }
           });
         }
@@ -109,7 +132,7 @@ router.post('/api/usersignin', function(req, res, next){
             res.json(obj);
           });
           }else{
-            res.json({'email':'email already exists'});
+            res.json({"email":"email already exists"});
           }
         });
       }
@@ -132,7 +155,7 @@ router.post('/api/forgotpassowrd', function(req, res, next) {
       User.checkUserEmail(email, function(err, user){
         if(err)throw err;
         if(!user){
-          res.json({"email":'email not found in the db'});
+          res.json({"email":"email not found"});
         }else{
             async.waterfall([
               function(done){
@@ -167,13 +190,13 @@ router.post('/api/forgotpassowrd', function(req, res, next) {
                     'If you did not request this, please ignore this email and your password will remain unchanged.\n'
                 };
                 smtpTransport.sendMail(mailOptions, function(err) {
-                  res.json({"reset":'An e-mail has been sent to ' + user.emailAddress + ' with further instructions.'});
+                  res.json('An e-mail has been sent to ' + user.emailAddress + ' with further instructions.');
                   done(err, 'done');
                 });
               }
             ], function(err){
               if(err) throw err;
-              res.json('fatal error');
+              res.json({"error":"fatal error"});
             });
           }
         });
@@ -188,9 +211,9 @@ router.get('/api/reset/:token', function(req, res) {
   User.checkResetPasswordToken(getToken, function(err, user){
     if(err) throw err;
     if(!user){
-      res.json({"expire":'passoword token has expired'});
+      res.json({"expired":"passoword token has expired"});
     }else{
-      res.json('passoword token is still valid');
+      res.json({"password":"passoword token is still valid"});
     }
   })
 });
@@ -219,7 +242,7 @@ router.post('/api/reset/:token', function(req, res, next) {
         function(done){
           User.checkResetPasswordToken(getToken, function(err, user){
             if (!user) {
-              res.json('passoword token has expired');
+              res.json({"expired":"passoword token has expired"});
             }else{
               User.createUserPassword(user, password,function(err, user){
                 if(err)throw err;
@@ -244,13 +267,13 @@ router.post('/api/reset/:token', function(req, res, next) {
             'This is a confirmation that the password for your account ' + user.emailAddress + ' has just been changed.\n'
           };
           smtpTransport.sendMail(mailOptions, function(err) {
-            res.json('password updated still chceck your mail');
+            res.json({"password":"password updated chceck your mail to confirm"});
             done(err);
           });
         }
       ], function(err){
         if(err) throw err;
-        res.json('fatal error');
+        res.json({"error":"fatal error"});
       });
       }
   });
@@ -397,22 +420,23 @@ router.post('/api/updatepassword', function(req, res, next){
 
 //add course
 router.post('/api/addcourse', function(req, res, next){
-  var courseCode;
+  var courseCode = req.body.courseCode;
   var courseTitle = req.body.courseTitle;
   var coursePrice = req.body.coursePrice;
   var place = req.body.place;
   var startingAt = req.body.startingAt;
   var endingAt = req.body.endingAt;
   var maxCapacity = req.body.maxCapacity;
-  var createdAt = new Date();
+  var time = new Date();
   
+  req.checkBody('courseCode', 'Course Code is required').notEmpty();
   req.checkBody('courseTitle', 'Course Title is required').notEmpty();
-  req.checkBody('coursePrice', 'Username is required').notEmpty();
-  req.checkBody('place', 'Email Address is required').notEmpty();
-  req.checkBody('startingAt', 'Email Address is invalid').isEmail();
-  req.checkBody('endingAt', 'Password is required').notEmpty();
-  req.checkBody('maxCapacity', 'Password is required').notEmpty();
-  req.checkBody('createdAt', 'Password is required').notEmpty();
+  req.checkBody('coursePrice', 'Course Price is required').notEmpty();
+  req.checkBody('place', 'Place is required').notEmpty();
+  req.checkBody('startingAt', 'Starting date of course is invalid').notEmpty();
+  req.checkBody('endingAt', 'Ending date of course is required').notEmpty();
+  req.checkBody('maxCapacity', 'Max Capacity is required').notEmpty();
+
   
   var result = req.getValidationResult();
   req.getValidationResult().then(function(result){
@@ -421,12 +445,108 @@ router.post('/api/addcourse', function(req, res, next){
       //send validaton errors
       res.json(errors)
     }else{
+      var newCourse = new Course({
+        courseCode: courseCode,
+        courseTitle : courseTitle,
+        coursePrice : coursePrice,
+        place : place,
+        startingAt: new Date(startingAt),
+        endingAt : new Date(startingAt),
+        maxCapacity : maxCapacity,
+        createdAt : time
+      });
 
-      }
+      Course.createCourse(newCourse, function(err, user){
+        if(err)throw err;
+        var obj =  {
+          success: 'course created successfully'
+        }
+        res.json(obj);
+      }); 
+    }
   });
 });
 
-//create code
+//getuserprofile
+router.get('/api/userprofile', function(req, res, next){
+  var emailAddress = req.query.email;
+  console.log(emailAddress)
+  User.findOne({emailAddress:emailAddress}).then((email) => {
+    if(email) {res.json(email); console.log(email)} else res.json({})
+  },(err)=>res.sendStatus(404))
+});
+
+//view publication 
+
+router.get("/api/publications", function (req,res,next) { 
+  Publication.find().then((data) => {
+    if(data){
+      console.log(data)
+      res.json(data)
+    } else res.json({})
+  },(err)=>res.sendStatus(500))
+ })
+//create publicaton
+router.post('/api/addpublication', function(req, res, next){
+  var title = req.body.title;
+  var body = req.body.body;
+  var author = req.body.author;
+  var time = moment().format("dddd, MMMM Do YYYY, h:mm:ss a");
+  var pubImg;
+  
+  req.checkBody('title', 'Title is required').notEmpty();
+  req.checkBody('body', 'Body is required').notEmpty();
+  req.checkBody('author', 'Author is required').notEmpty();
+
+  var result = req.getValidationResult();
+  req.getValidationResult().then(function(result){
+    if(!result.isEmpty()){
+      var errors = result.array();
+      //send validaton errors
+      res.json(errors)
+    }else{
+      var newPublication = new Publication({
+        title: title,
+        body : body,
+        author : author,
+        createdAt : time
+      });
+
+      Publication.createPublication(newPublication, function(err, user){
+          if(err)throw err;
+          var obj =  {
+            success: 'publication created successfully'
+          }
+          res.json(obj);
+      });
+    }
+  });
+});
+
+
+//add publication img
+router.post('/api/addpublicationimg', function(req, res, next){
+  var pubId = req.query.id; //or can be a normal req.body variable
+  upload(req, res, function(err) {
+    if (err) {
+       res.json({"error": "somthing went wrong"});
+    }
+    Publication.getPublicationById(pubId, function(err, user){
+      if(err)throw err;
+      if(!user){
+        res.json({"error": "no publication with that id"});
+      }else{
+        img = req.file.filename;
+        Publication.setImaage(user, img, function(err, user){
+            if(err)throw err;
+            res.json({"success": "image for publication done"});
+        });
+      }
+    });
+  }); 
+});
+
+//create code (random)
 router.get('/api/createcode', function(req, res, next){
   crypto.randomBytes(20, function(err, buf) {
     var secret = buf.toString('hex');
@@ -437,10 +557,4 @@ router.get('/api/createcode', function(req, res, next){
   });
 });
 
-//logout route
-router.get('/api/logout', function(req, res, next){
-  req.logout();
-  res.json('logout successful');
-  res.redirect('/');
-});
 module.exports = router;

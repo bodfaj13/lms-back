@@ -36,4 +36,11 @@ module.exports.findAllPublication = function(callback){
     Publication.find(callback);
 }
 
+module.exports.setImaage = function(user, img, callback){
+    user.img = img;
+    user.save(callback)
+}
 
+
+
+ 

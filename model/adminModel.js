@@ -4,7 +4,6 @@ var bcrypt = require('bcrypt');
 var adminSchema = mongoose.Schema({
     name: {
         type: String,
-        required: true
     },
     username: {
         type: String,
@@ -17,16 +16,15 @@ var adminSchema = mongoose.Schema({
     },
     emailAddress: {
         type: String,
-        required: true
     },
     profilePicture : {
         type: String
     },
     createdAt: {
         type: Date, 
-        required: true
     }
 });
 
-var Admin = module.exports = mongoose.model('admins', studentSchema);
+var Admin = mongoose.model('admin', adminSchema);
+ module.exports = Admin
 
