@@ -1,0 +1,9 @@
+{
+    "Title": "fiverrapp",
+    "Author": "Devcon et Jibo",
+    "Description": "",
+    "sessionSecret": "fiverrapp",
+    "emailAddress" : "bellohargbola13@gmail.com",
+    "emailPassword": "@hargbola13",
+    "jwtSecret": "somesecret"
+}
